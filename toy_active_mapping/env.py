@@ -15,7 +15,7 @@ from utils import unicycle_dyn, diff_FoV_land
 STATE_DIM = 3
 LANDMARK_DIM = 2
 LANDMARK_NUM = 2
-RADIUS = 2
+RADIUS = .2
 STD = 0.5
 KAPPA = 0.2
 
