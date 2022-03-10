@@ -14,7 +14,7 @@ def make_ddpg_agent(env):
 
     # model
     # model = DDPG('MlpPolicy', env, action_noise=action_noise, buffer_size=200000, learning_starts=10000, gamma=0.98, policy_kwargs=dict(net_arch=[400, 300]), verbose=1, tensorboard_log="./tensorboard/ddpg_toy_active_mapping/") # zoo
-    model = DDPG('MlpPolicy', env, action_noise=action_noise, verbose=1, tensorboard_log="./tensorboard/ddpg_toy_active_mapping/") # default
+    model = DDPG('MlpPolicy', env, action_noise=action_noise, verbose=1, tensorboard_log="./toy_active_mapping/tensorboard/ddpg_toy_active_mapping/") # default
 
     return model
 
