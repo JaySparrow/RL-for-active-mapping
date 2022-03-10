@@ -2,3 +2,4 @@ toy_example/__pycache__
 toy_active_mapping/__pycache__
 toy_active_mapping/checkpoints
 toy_active_mapping/plots
+tensorboard/
