@@ -28,4 +28,4 @@ if __name__ == '__main__':
     # train agent
     model = make_ddpg_agent(env)
     model.learn(total_timesteps=NUM_STEPS, log_interval=LOG_INTERVAL, tb_log_name="default")
-    model.save("checkpoints/ddpg_toy_active_mapping/default")
+    model.save("./toy_active_mapping/checkpoints/ddpg_toy_active_mapping/default")
