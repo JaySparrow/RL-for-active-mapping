@@ -7,7 +7,7 @@ map_filepath: "../maps/map6_converted.png"
 
 # training
 num_envs: 1
-num_steps: 10000
+num_steps: 2500000
 
 gamma: 0.99
 lr: 0.001
@@ -16,7 +16,7 @@ seed: 0
 # algorithm
 algorithm: "PPO" # {"DDPG", "PPO"}
 ppo:
-  n_steps: 1024 # buffer_size = n_steps * num_envs
+  n_steps: 2048 # buffer_size = n_steps * num_envs
   batch_size: 64
   n_epochs: 10
   gae_lambda: 0.95

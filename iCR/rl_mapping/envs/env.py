@@ -41,8 +41,9 @@ class VolumetricQuadrotor(gym.Env):
         self.xmax, self.ymax, _ = self.distrib_map.get_size()
         self.ox, self.oy = self.distrib_map.origin
         self.observation_space = spaces.Dict({
-            'info': spaces.Box(low=-np.inf, high=np.inf, shape=(1, h, w), dtype=np.float32),
-            'pose': spaces.Box(low=np.array([self.ox, self.oy]), high=np.array([self.xmax + self.ox, self.ymax + self.oy]), dtype=np.float32)
+            'info': spaces.Box(low=-np.inf, high=np.inf, shape=(2, h, w), dtype=np.float32),
+            'pose': spaces.Box(low=np.array([self.ox, self.oy, self.ox, self.oy]), high=np.array(
+                [self.xmax + self.ox, self.ymax + self.oy, self.xmax + self.ox, self.ymax + self.oy]), dtype=np.float32)
         })
 
         ## action space: linearly controlling the x, y velocities, yaw angle is fixed as 0
@@ -99,7 +100,7 @@ class VolumetricQuadrotor(gym.Env):
         cur_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
         # log of reward diff + boundary penalty
         if self.is_log:
-            r_diff = np.log(cur_r - self.last_r)
+            r_diff = cur_r - self.last_r
         else:
             r_diff = cur_r - self.last_r
         r = r_diff - np.abs(dist_outside / self.control_scale) * self.boundary_penalty_coef
@@ -108,8 +109,9 @@ class VolumetricQuadrotor(gym.Env):
 
         # obs
         obs = {
-            'info': self.info_vec.astype(np.float32)[np.newaxis, :, :],
-            'pose': self.agent_pos[:2]
+            'info': np.concatenate((self.info_vec_old.astype(np.float32)[np.newaxis, :, :],
+                                    self.info_vec.astype(np.float32)[np.newaxis, :, :]), axis=0),
+            'pose': np.array(list(self.agent_pos_old[:2]) + list(self.agent_pos[:2]))
         }
 
         done = False
@@ -118,21 +120,26 @@ class VolumetricQuadrotor(gym.Env):
 
         # info
         info = {}
-
+        r = r * 10 / (-cur_r)
+        self.info_vec_old = self.info_vec
+        self.agent_pos_old = self.agent_pos
         return obs, r, done, info
 
     def reset(self):
 
         # init
         self.info_vec = self.distrib_map.data[:, :, 1].copy() # (h, w)
+        self.info_vec_old = self.info_vec
         self.agent_pos = np.array([self.ox + self.xmax/2, self.oy + self.ymax/2, 0.], dtype=np.float32) # (3, )
+        self.agent_pos_old = self.agent_pos
         self.last_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
         self.current_step = -1
 
         # construct observation
         obs = {
-            'info': self.info_vec.astype(np.float32)[np.newaxis, :, :],
-            'pose': self.agent_pos[:2]
+            'info': np.concatenate((self.info_vec_old.astype(np.float32)[np.newaxis, :, :],
+                                    self.info_vec.astype(np.float32)[np.newaxis, :, :]), axis=0),
+            'pose': np.array(list(self.agent_pos_old[:2]) + list(self.agent_pos[:2]))
         }
 
         return obs
