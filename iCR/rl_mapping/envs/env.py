@@ -100,7 +100,7 @@ class VolumetricQuadrotor(gym.Env):
         cur_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
         # log of reward diff + boundary penalty
         if self.is_log:
-            r_diff = cur_r - self.last_r
+            r_diff = np.log(cur_r - self.last_r)
         else:
             r_diff = cur_r - self.last_r
         r = r_diff - np.abs(dist_outside / self.control_scale) * self.boundary_penalty_coef
@@ -120,7 +120,7 @@ class VolumetricQuadrotor(gym.Env):
 
         # info
         info = {}
-        r = r * 10 / (-cur_r)
+        r = r * (cur_r + 2186174.78334106) / 4000000
         self.info_vec_old = self.info_vec
         self.agent_pos_old = self.agent_pos
         return obs, r, done, info
