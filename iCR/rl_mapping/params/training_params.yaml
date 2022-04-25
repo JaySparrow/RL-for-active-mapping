@@ -30,7 +30,7 @@ ddpg:
 log_interval: 1
 
 # checkpoints
-save_frequency: 1000 # in steps
+save_frequency: 10000 # in steps
 checkpoints_folder: "./checkpoints/ppo-cnn/"
 
 # tensorboard
