@@ -71,6 +71,6 @@ def test(params_filepath: str, ckpt_name: str=""):
 
 if __name__ == '__main__':
     # test("checkpoints/ppo/no_bound/training_params.yaml")
-    test("checkpoints/ppo/no_bound/training_params.yaml", "no_bound_800000_steps.zip")
+    test("checkpoints/ppo-cnn/example/training_params.yaml", "example_20000_steps.zip")
 
         
