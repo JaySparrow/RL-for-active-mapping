@@ -1,0 +1,37 @@
+# experiment
+exp_name: "example"
+
+# paths
+env_params_filepath: "../params/toy_env_params.yaml"
+map_filepath: "../maps/map6_converted.png"
+
+# training
+num_envs: 1
+num_steps: 10000
+
+gamma: 0.99
+lr: 0.001
+seed: 0
+
+# algorithm
+algorithm: "PPO" # {"DDPG", "PPO"}
+ppo:
+  n_steps: 1024 # buffer_size = n_steps * num_envs
+  batch_size: 64
+  n_epochs: 10
+  gae_lambda: 0.95
+  clip_range: 0.2
+  ent_coef: 0.0
+ddpg:
+  buffer_size: 1024
+  tau: 0.005
+
+# log
+log_interval: 1 # DDPG: in episode; PPO: in n_steps 
+
+# checkpoints
+save_frequency: 1000 # in steps
+checkpoints_folder: "./checkpoints/toy-ppo/"
+
+# tensorboard
+tensorboard_folder: "./tensorboard/toy-ppo/"

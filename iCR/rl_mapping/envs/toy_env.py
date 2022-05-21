@@ -16,7 +16,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), "../../
 print(os.path.abspath("."))
 
 from bc_exploration.mapping.costmap import Costmap
-from bc_exploration.utilities.util import rc_to_xy
+from bc_exploration.utilities.util import rc_to_xy, xy_to_rc
 from bc_exploration.footprints.footprints import CustomFootprint
 from bc_exploration.footprints.footprint_points import get_tricky_circular_footprint, get_tricky_oval_footprint
 
@@ -25,11 +25,23 @@ from rl_mapping.sensors.semantic_sensors import SemanticLidar
 from rl_mapping.envs.semantic_grid_world import SemanticGridWorld
 from rl_mapping.mapping.mapper_kf import KFMapper
 
-class VolumetricQuadrotor(gym.Env):
+class ToyQuadrotor(gym.Env):
     metadata = {'render.modes': ['human', 'terminal']}
 
+    ACTIONS = {
+        0: np.array([0., 0.]), # no move
+        1: np.array([1., 0.]), # E
+        2: np.array([1/np.sqrt(2), 1/np.sqrt(2)]), # NE
+        3: np.array([0., 1.]), # N
+        4: np.array([-1/np.sqrt(2), 1/np.sqrt(2)]), # NW
+        5: np.array([-1., 0.]), # W
+        6: np.array([-1/np.sqrt(2), -1/np.sqrt(2)]), # SW
+        7: np.array([0., -1.]), # S
+        8: np.array([1/np.sqrt(2), -1/np.sqrt(2)]) # SE
+    }
+
     def __init__(self, map_filename: str, params_filename: str):
-        super(VolumetricQuadrotor, self).__init__()
+        super(ToyQuadrotor, self).__init__()
 
         ## parameters
         self.__load_params(params_filename)
@@ -37,38 +49,38 @@ class VolumetricQuadrotor(gym.Env):
         ## distribution map
         self.__load_distrib_map(map_filename)
 
-        ## observation space: diagonal entries of the information matrix (i.e. the information vector) + agent position
         h, w, _ = self.distrib_map.get_shape()
         self.xmax, self.ymax, _ = self.distrib_map.get_size()
         self.ox, self.oy = self.distrib_map.origin
-        self.observation_space = spaces.Dict({
-            'info': spaces.Box(low=-np.inf, high=np.inf, shape=(1, h, w), dtype=np.float32),
-            'pose': spaces.Box(low=np.array([self.ox, self.oy]), high=np.array([self.xmax + self.ox, self.ymax + self.oy]), dtype=np.float32)
-        })
 
-        ## action space: linearly controlling the x, y velocities, yaw angle is fixed as 0
-        # (x, y): {-control_scale, control_scale}^2
-        # scaled in the step function
-        self.action_space = spaces.Box(low=-1, high=1, shape=(2, ), dtype=np.float32) 
+        ## observation space: binary
+        # layer 1: detection map (1: detected; 0: undetected)
+        # layer 2: agent position (1: agent; 0: no agent)
+        # self.observation_space = spaces.MultiBinary([2, h, w])
+        self.observation_space = spaces.Box(low=0, high=1, shape=(2, h, w), dtype=int)
+
+        ## action space: discrete  
+        # velocities in the 8 directions with unit magnitude (i.e. \sqrt(vx^2 + vy^2) = 1) & no move
+        self.action_space = spaces.Discrete(9)
 
         ## init
         self.info_vec = self.distrib_map.data[:, :, 1].copy() # (h, w)
+        self.detection_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
 
         # corner
         # self.agent_pos = np.zeros(3, dtype=np.float32)
         # center
         self.agent_pos = np.array([self.ox + self.xmax/2, self.oy + self.ymax/2, 0.], dtype=np.float32) # (3, )
 
-        self.last_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
         self.current_step = -1
 
     def step(self, action):
+        assert self.action_space.contains(action), f"Invalid action: {action}!"
         self.current_step += 1
 
         ## rescale actions
-        action *= self.control_scale
-        control = np.hstack([
-            action, 
+        control = self.control_scale * np.hstack([
+            self.ACTIONS[action], 
             0
         ]).astype(np.float32)
 
@@ -79,10 +91,6 @@ class VolumetricQuadrotor(gym.Env):
 
         ## boundary enforce
         bounded_pos = np.clip(self.agent_pos[:2], [self.ox, self.oy], [self.xmax + self.ox, self.ymax + self.oy])
-        if not np.isclose(self.agent_pos[:2], bounded_pos).all():
-            dist_outside = np.linalg.norm(self.agent_pos[:2] - bounded_pos)
-        else:
-            dist_outside = 0
         self.agent_pos[:2] = bounded_pos
 
         ## update information: vectorized
@@ -101,22 +109,19 @@ class VolumetricQuadrotor(gym.Env):
         # update information
         self.info_vec[::self.downsample_rate, ::self.downsample_rate] += 1 / (self.std**2) * (1 - Phi)
 
-        ## calculate reward
-        cur_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
-        # log of reward diff + boundary penalty
-        if self.is_log:
-            r_diff = np.log(cur_r - self.last_r)
-        else:
-            r_diff = cur_r - self.last_r
-        r = r_diff - np.abs(dist_outside / self.control_scale) * self.boundary_penalty_coef
-        # update recorded last reward
-        self.last_r = cur_r
+        ## reward = percentage of newly detected cells \in [0, 1]
+        h, w = self.info_vec.shape
+        new_cells = np.logical_and(np.logical_not(np.isclose(Phi, 1.)), np.logical_not(self.detection_map))
+        r = float(np.sum(new_cells)) / (h * w)
+
+        ## update detection map
+        self.detection_map[np.where(new_cells)] = 1
 
         # obs
-        obs = {
-            'info': self.info_vec.astype(np.float32)[np.newaxis, :, :],
-            'pose': self.agent_pos[:2]
-        }
+        agent_r, agent_c = np.clip(xy_to_rc(self.agent_pos, self.distrib_map).astype(int)[:2], [0, 0], [h-1, w-1])
+        agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
+        agent_pos_map[agent_r, agent_c] = 1
+        obs = np.stack([self.detection_map, agent_pos_map]).astype(int)
 
         done = False
         if self.current_step >= self.total_step-1:
@@ -131,20 +136,21 @@ class VolumetricQuadrotor(gym.Env):
 
         # init
         self.info_vec = self.distrib_map.data[:, :, 1].copy() # (h, w)
+        self.detection_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
         
         # corner
         # self.agent_pos = np.zeros(3, dtype=np.float32)
         # center
         self.agent_pos = np.array([self.ox + self.xmax/2, self.oy + self.ymax/2, 0.], dtype=np.float32) # (3, )
 
-        self.last_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
         self.current_step = -1
 
         # construct observation
-        obs = {
-            'info': self.info_vec.astype(np.float32)[np.newaxis, :, :],
-            'pose': self.agent_pos[:2]
-        }
+        agent_r, agent_c, _ = xy_to_rc(self.agent_pos, self.distrib_map).astype(int)
+        agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
+        agent_pos_map[agent_r, agent_c] = 1
+
+        obs = np.stack([self.detection_map, agent_pos_map]).astype(int)
 
         return obs
 
@@ -184,9 +190,6 @@ class VolumetricQuadrotor(gym.Env):
             pass
         self.footprint_angular_resolution = params['footprint']['angular_resolution']
         self.footprint_inflation_scale = params['footprint']['inflation_scale']
-        # reward
-        self.is_log = params['is_log']
-        self.boundary_penalty_coef = params['boundary_penalty_coef']
 
     def __load_distrib_map(self, map_filename: str):
 
@@ -230,13 +233,12 @@ class VolumetricQuadrotor(gym.Env):
 
         self.distrib_map = self.mapper.get_distrib_map()
 
-
 if __name__ == '__main__':
-    params_filename = '../params/env_params.yaml'
+    params_filename = '../params/toy_env_params.yaml'
     map_filename = '../maps/map6_converted.png'
 
     ### create env & test random actions ###
-    env = VolumetricQuadrotor(map_filename, params_filename)
+    env = ToyQuadrotor(map_filename, params_filename)
     check_env(env)
     print("env size    :", env.xmax, env.ymax)
     print("starting pos:", env.agent_pos[:-1])
@@ -245,19 +247,22 @@ if __name__ == '__main__':
     done = False
     total_reward = 0
 
-    actions = [np.array([ 1.,  0.]) for _ in range(5)] +\
-              [np.array([ 0.,  1.]) for _ in range(8)] +\
-              [np.array([ -1., 0.]) for _ in range(10)] +\
-              [np.array([ 0.,  -1.]) for _ in range(7)]
+    actions = [1 for _ in range(5)] +\
+              [3 for _ in range(8)] +\
+              [5 for _ in range(10)] +\
+              [7 for _ in range(7)]
 
+    time.sleep(3)
     while not done:
         action = actions[env.current_step+1]
+        print("action =", env.ACTIONS[action])
 
         obs, r, done, info = env.step(action)
+        print("pos =", np.hstack(np.where(np.isclose(obs[1], 1))))
 
         total_reward += r
 
-        print("reward: ", r)
+        print(f"reward = {r}\n")
         env.render()
 
     print("---")

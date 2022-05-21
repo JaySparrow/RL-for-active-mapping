@@ -2,13 +2,14 @@ from stable_baselines3 import DDPG, PPO
 
 import os, sys
 import yaml
+import numpy as np
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
 print(cur_path)
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), "../../"))
 print(os.path.abspath("."))
 
-from rl_mapping.envs.env import VolumetricQuadrotor
+from rl_mapping.envs.toy_env import ToyQuadrotor
 
 NUM_TEST = 1
 
@@ -19,7 +20,7 @@ def test(params_filepath: str, ckpt_name: str=""):
 
     ### create env ###
     env_params_filepath = os.path.join(os.path.split(params_filepath)[0], os.path.split(params['env_params_filepath'])[1])
-    env = VolumetricQuadrotor(params['map_filepath'], env_params_filepath)
+    env = ToyQuadrotor(params['map_filepath'], env_params_filepath)
 
     ### load model ###
     if ckpt_name == "":
@@ -32,6 +33,10 @@ def test(params_filepath: str, ckpt_name: str=""):
         raise NotImplementedError
 
     ### get parameters ###
+    try:
+        gamma = float(agent.gamma)
+    except:
+        gamma = 1.
     gamma = 1.
     print(f"gamma = {gamma}")
 
@@ -43,16 +48,16 @@ def test(params_filepath: str, ckpt_name: str=""):
         total_reward = 0
 
         print(f"\n------ Eps {eps} ------")
-        print(f"init pose = {obs['pose']}")
+        print(f"init pose = {np.hstack(np.where(np.isclose(obs[1], 1)))}")
 
         while not done:
             # get action
             action, _state = agent.predict(obs)
-            print("action =", action)
+            print("action =", env.ACTIONS[action])
 
             # step env
             obs, r, done, info = env.step(action)
-            print("obs =", obs['pose'])
+            print("pose =", np.hstack(np.where(np.isclose(obs[1], 1))))
 
             # calc return
             total_reward += r * (gamma ** env.current_step)
@@ -69,6 +74,7 @@ def test(params_filepath: str, ckpt_name: str=""):
 if __name__ == '__main__':
     exp_name = "example"
     ckpt_num = 2000
-    test(f"checkpoints/ppo/{exp_name}/training_params.yaml")
-    # test(f"checkpoints/ppo/{exp_name}/training_params.yaml", f"{exp_name}_{ckpt_num}_steps")
+    test(f"checkpoints/toy-ppo/{exp_name}/toy_training_params.yaml")
+    # test(f"checkpoints/toy-ppo/{exp_name}/toy_training_params.yaml", f"{exp_name}_{ckpt_num}_steps.zip")
+
         

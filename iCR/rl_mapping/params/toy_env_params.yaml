@@ -1,0 +1,14 @@
+footprint:
+  type: 'tricky_circle'
+  angular_resolution: 0.01745
+  inflation_scale: 1.0
+
+horizon: 30
+dt: 1
+kappa: 0.5
+
+downsample_rate: 1
+sensor_range: 1.5 # 3
+
+control_scale: 1.0
+std: 0.01
