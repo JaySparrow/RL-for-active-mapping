@@ -1,5 +1,5 @@
 # experiment
-exp_name: "example"
+exp_name: "fov-obs-small-fov"
 
 # paths
 env_params_filepath: "../params/toy_env_params.yaml"
@@ -7,7 +7,7 @@ map_filepath: "../maps/map6_converted.png"
 
 # training
 num_envs: 1
-num_steps: 10000
+num_steps: 1000000
 
 gamma: 0.99
 lr: 0.001
@@ -30,7 +30,7 @@ ddpg:
 log_interval: 1 # DDPG: in episode; PPO: in n_steps 
 
 # checkpoints
-save_frequency: 1000 # in steps
+save_frequency: 25000 # in steps
 checkpoints_folder: "./checkpoints/toy-ppo/"
 
 # tensorboard

@@ -257,7 +257,7 @@ if __name__ == '__main__':
 
         total_reward += r
 
-        print("reward: ", r)
+        print("reward: ", r, "pos: ", obs['pose'])
         env.render()
 
     print("---")

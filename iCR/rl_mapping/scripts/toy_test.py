@@ -3,6 +3,7 @@ from stable_baselines3 import DDPG, PPO
 import os, sys
 import yaml
 import numpy as np
+import time
 
 cur_path = os.path.abspath(os.path.dirname(__file__))
 print(cur_path)
@@ -53,11 +54,14 @@ def test(params_filepath: str, ckpt_name: str=""):
         while not done:
             # get action
             action, _state = agent.predict(obs)
-            print("action =", env.ACTIONS[action])
+            if env.use_discrete_act:
+                print("action =", env.ACTIONS[action])
+            else:
+                print("action =", action)
 
             # step env
             obs, r, done, info = env.step(action)
-            print("pose =", np.hstack(np.where(np.isclose(obs[1], 1))))
+            print("pose =", env.get_agent_coord(env.agent_pos))
 
             # calc return
             total_reward += r * (gamma ** env.current_step)
@@ -72,8 +76,9 @@ def test(params_filepath: str, ckpt_name: str=""):
     env.close()
 
 if __name__ == '__main__':
-    exp_name = "example"
-    ckpt_num = 2000
+    exp_name = "fov-obs-small-fov"
+    ckpt_num = 400000
+    time.sleep(3)
     test(f"checkpoints/toy-ppo/{exp_name}/toy_training_params.yaml")
     # test(f"checkpoints/toy-ppo/{exp_name}/toy_training_params.yaml", f"{exp_name}_{ckpt_num}_steps.zip")
 

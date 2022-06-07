@@ -55,13 +55,19 @@ class ToyQuadrotor(gym.Env):
 
         ## observation space: binary
         # layer 1: detection map (1: detected; 0: undetected)
-        # layer 2: agent position (1: agent; 0: no agent)
+        # layer 2: agent position (1: agent; 0: no agent) or agent fov (1: fov cells, 0: non-fov cells)
         # self.observation_space = spaces.MultiBinary([2, h, w])
         self.observation_space = spaces.Box(low=0, high=1, shape=(2, h, w), dtype=int)
 
-        ## action space: discrete  
-        # velocities in the 8 directions with unit magnitude (i.e. \sqrt(vx^2 + vy^2) = 1) & no move
-        self.action_space = spaces.Discrete(9)
+        if self.use_discrete_act:
+            ## action space: discrete  
+            # velocities in the 8 directions with unit magnitude (i.e. \sqrt(vx^2 + vy^2) = 1) & no move
+            self.action_space = spaces.Discrete(9)
+        else:
+            ## action space: linearly controlling the x, y velocities, yaw angle is fixed as 0
+            # (x, y): {-control_scale, control_scale}^2
+            # scaled in the step function
+            self.action_space = spaces.Box(low=-1, high=1, shape=(2, ), dtype=np.float32)
 
         ## init
         self.info_vec = self.distrib_map.data[:, :, 1].copy() # (h, w)
@@ -74,13 +80,42 @@ class ToyQuadrotor(gym.Env):
 
         self.current_step = -1
 
+    def get_Phi(self, agent_pos):
+        # get pos matrix
+        T = state_to_T(agent_pos)
+
+        # downsample & reshape indices of the map
+        idx_mat = np.indices(self.info_vec.shape)[:, ::self.downsample_rate, ::self.downsample_rate] # (2, h / downsample_rate, w / downsample_rate) = (2, h', w')
+        idx     = idx_mat.reshape((2, -1)).T # (h' x w', 2) = (N, 2)
+        # convert row, column to x, y
+        p_ij = rc_to_xy(idx, self.distrib_map) # (N, 2)
+        # operate indices coordinates: convert to agent coordinate system
+        q = T[:2, :2].transpose() @ (p_ij - T[:2, 2]).T # (2, N)
+        # SDF
+        d, _ = circle_SDF(q, self.sensor_range) # (N, )
+
+        # gaussian
+        Phi, _ = Gaussian_CDF(d, self.kappa) # (N, )
+        Phi = Phi.reshape((idx_mat.shape[1:])) # (h', w')
+
+        return Phi # (h', w')
+
+    def get_agent_coord(self, agent_pos):
+        h, w = self.info_vec.shape
+        agent_coord = np.clip(xy_to_rc(agent_pos, self.distrib_map).astype(int)[:2], [0, 0], [h-1, w-1])
+        return agent_coord
+
     def step(self, action):
         assert self.action_space.contains(action), f"Invalid action: {action}!"
         self.current_step += 1
 
         ## rescale actions
+        if self.use_discrete_act:
+            act = self.ACTIONS[action]
+        else:
+            act = action
         control = self.control_scale * np.hstack([
-            self.ACTIONS[action], 
+            act, 
             0
         ]).astype(np.float32)
 
@@ -93,41 +128,35 @@ class ToyQuadrotor(gym.Env):
         bounded_pos = np.clip(self.agent_pos[:2], [self.ox, self.oy], [self.xmax + self.ox, self.ymax + self.oy])
         self.agent_pos[:2] = bounded_pos
 
-        ## update information: vectorized
-        # downsample indices
-        idx_mat = np.indices(self.info_vec.shape)[:, ::self.downsample_rate, ::self.downsample_rate] # (2, h / downsample_rate, w / downsample_rate) = (2, h', w')
-        idx     = idx_mat.reshape((2, -1)).T # (h' x w', 2) = (N, 2)
-        # convert row, column to x, y
-        p_ij = rc_to_xy(idx, self.distrib_map) # (N, 2)
-        # operate poses
-        q = T_old[:2, :2].transpose() @ (p_ij - T_old[:2, 2]).T # (2, N)
-        # SDF
-        d, _ = circle_SDF(q, self.sensor_range) # (N, )
-        # gaussian
-        Phi, _ = Gaussian_CDF(d, self.kappa) # (N, )
-        Phi = Phi.reshape((idx_mat.shape[1:])) # (h', w')
-        # update information
+        ## obtain observed area, new pos
+        Phi = self.get_Phi(self.agent_pos) # (h', w')
+
+        ## update information
         self.info_vec[::self.downsample_rate, ::self.downsample_rate] += 1 / (self.std**2) * (1 - Phi)
 
         ## reward = percentage of newly detected cells \in [0, 1]
         h, w = self.info_vec.shape
-        new_cells = np.logical_and(np.logical_not(np.isclose(Phi, 1.)), np.logical_not(self.detection_map))
+        detected_cells = np.logical_not(np.isclose(Phi, 1.))
+        new_cells = np.logical_and(detected_cells, np.logical_not(self.detection_map))
         r = float(np.sum(new_cells)) / (h * w)
 
         ## update detection map
         self.detection_map[np.where(new_cells)] = 1
 
-        # obs
-        agent_r, agent_c = np.clip(xy_to_rc(self.agent_pos, self.distrib_map).astype(int)[:2], [0, 0], [h-1, w-1])
-        agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
-        agent_pos_map[agent_r, agent_c] = 1
-        obs = np.stack([self.detection_map, agent_pos_map]).astype(int)
+        ## obs
+        if self.use_fov_obs:
+            obs = np.stack([self.detection_map, detected_cells]).astype(int)
+        else:
+            agent_r, agent_c = self.get_agent_coord(agent_pos=self.agent_pos)
+            agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
+            agent_pos_map[agent_r, agent_c] = 1
+            obs = np.stack([self.detection_map, agent_pos_map]).astype(int)
 
         done = False
         if self.current_step >= self.total_step-1:
             done = True
 
-        # info
+        ## info
         info = {}
 
         return obs, r, done, info
@@ -137,20 +166,26 @@ class ToyQuadrotor(gym.Env):
         # init
         self.info_vec = self.distrib_map.data[:, :, 1].copy() # (h, w)
         self.detection_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
+        self.current_step = -1
         
         # corner
         # self.agent_pos = np.zeros(3, dtype=np.float32)
         # center
         self.agent_pos = np.array([self.ox + self.xmax/2, self.oy + self.ymax/2, 0.], dtype=np.float32) # (3, )
 
-        self.current_step = -1
+        # obtain observed area
+        Phi = self.get_Phi(self.agent_pos) # (h', w')
+        detected_cells = np.logical_not(np.isclose(Phi, 1.))
 
-        # construct observation
-        agent_r, agent_c, _ = xy_to_rc(self.agent_pos, self.distrib_map).astype(int)
-        agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
-        agent_pos_map[agent_r, agent_c] = 1
-
-        obs = np.stack([self.detection_map, agent_pos_map]).astype(int)
+        ## obs
+        self.detection_map = detected_cells.copy()
+        if self.use_fov_obs:
+            obs = np.stack([self.detection_map, detected_cells]).astype(int)
+        else:
+            agent_r, agent_c = self.get_agent_coord(agent_pos=self.agent_pos)
+            agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
+            agent_pos_map[agent_r, agent_c] = 1
+            obs = np.stack([self.detection_map, agent_pos_map]).astype(int)
 
         return obs
 
@@ -190,6 +225,10 @@ class ToyQuadrotor(gym.Env):
             pass
         self.footprint_angular_resolution = params['footprint']['angular_resolution']
         self.footprint_inflation_scale = params['footprint']['inflation_scale']
+        # obs
+        self.use_fov_obs = params['use_fov_obs']
+        # act
+        self.use_discrete_act = params['use_discrete_act']
 
     def __load_distrib_map(self, map_filename: str):
 
@@ -247,18 +286,26 @@ if __name__ == '__main__':
     done = False
     total_reward = 0
 
-    actions = [1 for _ in range(5)] +\
+    actions0 = [1 for _ in range(5)] +\
               [3 for _ in range(8)] +\
               [5 for _ in range(10)] +\
               [7 for _ in range(7)]
+    actions1 = [np.array([ 1.,  0.]) for _ in range(5)] +\
+              [np.array([ 0.,  1.]) for _ in range(8)] +\
+              [np.array([ -1., 0.]) for _ in range(10)] +\
+              [np.array([ 0.,  -1.]) for _ in range(7)]
 
     time.sleep(3)
     while not done:
-        action = actions[env.current_step+1]
-        print("action =", env.ACTIONS[action])
+        if env.use_discrete_act:
+            action = actions0[env.current_step+1]
+            print("action =", env.ACTIONS[action])
+        else:
+            action = actions1[env.current_step+1]
+            print("action =", action)
 
         obs, r, done, info = env.step(action)
-        print("pos =", np.hstack(np.where(np.isclose(obs[1], 1))))
+        print("pos =", env.get_agent_coord(env.agent_pos))
 
         total_reward += r
 

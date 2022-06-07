@@ -27,11 +27,11 @@ ddpg:
   tau: 0.005
 
 # log
-log_interval: 1
+log_interval: 1 # DDPG: in episode; PPO: in n_steps 
 
 # checkpoints
-save_frequency: 1000 # in steps
-checkpoints_folder: "./checkpoints/ppo-cnn/"
+save_frequency: 500 # in steps
+checkpoints_folder: "./checkpoints/ppo/"
 
 # tensorboard
-tensorboard_folder: "./tensorboard/ppo-cnn/"
+tensorboard_folder: "./tensorboard/ppo/"

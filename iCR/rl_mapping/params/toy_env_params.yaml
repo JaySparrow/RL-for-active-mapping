@@ -8,7 +8,13 @@ dt: 1
 kappa: 0.5
 
 downsample_rate: 1
-sensor_range: 1.5 # 3
+sensor_range: 1.5
 
 control_scale: 1.0
 std: 0.01
+
+# obs
+use_fov_obs: True # True: fov in obs; False: position in obs
+
+# action
+use_discrete_act: True # True: discrete action space; False: continuous action space
