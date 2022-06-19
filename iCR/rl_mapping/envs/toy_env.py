@@ -49,15 +49,25 @@ class ToyQuadrotor(gym.Env):
         ## distribution map
         self.__load_distrib_map(map_filename)
 
+        ## dimensions
         h, w, _ = self.distrib_map.get_shape()
         self.xmax, self.ymax, _ = self.distrib_map.get_size()
         self.ox, self.oy = self.distrib_map.origin
 
-        ## observation space: binary
-        # layer 1: detection map (1: detected; 0: undetected)
-        # layer 2: agent position (1: agent; 0: no agent) or agent fov (1: fov cells, 0: non-fov cells)
-        # self.observation_space = spaces.MultiBinary([2, h, w])
-        self.observation_space = spaces.Box(low=0, high=1, shape=(2, h, w), dtype=int)
+        if self.use_diff_obs:
+            ## observation space: differential/continuous
+            # layer 1: info map 
+            # layer 2: agent's differential fov (1-Phi)
+            # max update per step for each cell: 1 / (\sigma^2); min: 0
+            self.info_max = self.distrib_map.data[:, :, 1].max()+self.total_step/self.std**2
+            self.info_min = self.distrib_map.data[:, :, 1].min()
+            # assert self.info_min > 0, f"initial information map has non-positive entry: {self.info_min}!"
+            self.observation_space = spaces.Box(low=min(self.info_min, 0.), high=self.info_max, shape=(2, h, w), dtype=np.float32)
+        else:
+            ## observation space: binary
+            # layer 1: detection map (1: detected; 0: undetected)
+            # layer 2: agent position (1: agent; 0: no agent) or agent fov (1: fov cells, 0: non-fov cells)
+            self.observation_space = spaces.Box(low=0, high=1, shape=(2, h, w), dtype=int)
 
         if self.use_discrete_act:
             ## action space: discrete  
@@ -77,6 +87,8 @@ class ToyQuadrotor(gym.Env):
         # self.agent_pos = np.zeros(3, dtype=np.float32)
         # center
         self.agent_pos = np.array([self.ox + self.xmax/2, self.oy + self.ymax/2, 0.], dtype=np.float32) # (3, )
+
+        self.last_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
 
         self.current_step = -1
 
@@ -133,20 +145,49 @@ class ToyQuadrotor(gym.Env):
 
         ## update information
         self.info_vec[::self.downsample_rate, ::self.downsample_rate] += 1 / (self.std**2) * (1 - Phi)
+        assert np.all((self.info_min <= self.info_vec) & (self.info_vec <= self.info_max)), "information entry out of bound"
 
-        ## reward = percentage of newly detected cells \in [0, 1]
+        ## obtain newly detected cells
         h, w = self.info_vec.shape
         detected_cells = np.logical_not(np.isclose(Phi, 1.))
         new_cells = np.logical_and(detected_cells, np.logical_not(self.detection_map))
-        r = float(np.sum(new_cells)) / (h * w)
+
+        if self.use_diff_obs:
+            ## reward = (normalized) difference between logdet of info map in consecutive steps
+            cur_r = float(np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate])))
+            
+            # ### reward 1 ###
+            # max_r = np.log(self.info_max - self.info_min) * h * w
+            # r = (cur_r - self.last_r) / max_r
+
+            ### reward 2 ###
+            max_r = np.log(self.info_max) * h * w
+            min_r = np.log(self.info_min) * h * w
+            assert np.all((self.last_r <= max_r+1e-6) & (self.last_r >= min_r-1e-6)), f"reward {self.last_r} is out of bound [{min_r}, {max_r}]"
+            r = (cur_r - self.last_r) / (max_r - min_r)
+
+            self.last_r = cur_r
+        else:
+            ## reward = percentage of newly detected cells \in [0, 1]
+            r = float(np.sum(new_cells)) / (h * w)
 
         ## update detection map
         self.detection_map[np.where(new_cells)] = 1
 
         ## obs
-        if self.use_fov_obs:
+        # continuous obs
+        if self.use_diff_obs:
+            # layer 1: diagonal entries of information matrix / information vector
+            # layer 2: differential fov
+            obs = np.stack([self.info_vec, 1-Phi]).astype(np.float32)
+        # discrete obs
+        elif self.use_fov_obs:
+            # layer 1: binary map of accumulated detected cells
+            # layer 2: binary map newly detected cells for the current step
             obs = np.stack([self.detection_map, detected_cells]).astype(int)
         else:
+            # layer 1: binary map of accumulated detected cells
+            # layer 2: binary map of agent position
             agent_r, agent_c = self.get_agent_coord(agent_pos=self.agent_pos)
             agent_pos_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
             agent_pos_map[agent_r, agent_c] = 1
@@ -166,6 +207,7 @@ class ToyQuadrotor(gym.Env):
         # init
         self.info_vec = self.distrib_map.data[:, :, 1].copy() # (h, w)
         self.detection_map = np.zeros(self.info_vec.shape, dtype=int) # (h, w)
+        self.last_r = np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate]))
         self.current_step = -1
         
         # corner
@@ -177,9 +219,13 @@ class ToyQuadrotor(gym.Env):
         Phi = self.get_Phi(self.agent_pos) # (h', w')
         detected_cells = np.logical_not(np.isclose(Phi, 1.))
 
-        ## obs
+        # detection map
         self.detection_map = detected_cells.copy()
-        if self.use_fov_obs:
+
+        ## obs
+        if self.use_diff_obs:
+            obs = np.stack([self.info_vec, 1-Phi]).astype(np.float32)
+        elif self.use_fov_obs:
             obs = np.stack([self.detection_map, detected_cells]).astype(int)
         else:
             agent_r, agent_c = self.get_agent_coord(agent_pos=self.agent_pos)
@@ -226,6 +272,7 @@ class ToyQuadrotor(gym.Env):
         self.footprint_angular_resolution = params['footprint']['angular_resolution']
         self.footprint_inflation_scale = params['footprint']['inflation_scale']
         # obs
+        self.use_diff_obs = params['use_diff_obs']
         self.use_fov_obs = params['use_fov_obs']
         # act
         self.use_discrete_act = params['use_discrete_act']
@@ -286,14 +333,16 @@ if __name__ == '__main__':
     done = False
     total_reward = 0
 
-    actions0 = [1 for _ in range(5)] +\
-              [3 for _ in range(8)] +\
-              [5 for _ in range(10)] +\
-              [7 for _ in range(7)]
-    actions1 = [np.array([ 1.,  0.]) for _ in range(5)] +\
-              [np.array([ 0.,  1.]) for _ in range(8)] +\
-              [np.array([ -1., 0.]) for _ in range(10)] +\
-              [np.array([ 0.,  -1.]) for _ in range(7)]
+    actions0 = [1 for _ in range(4)] +\
+              [3 for _ in range(6)] +\
+              [5 for _ in range(8)] +\
+              [7 for _ in range(12)] +\
+              [1 for _ in range(0)]
+    actions1 = [np.array([ 1.,  0.]) for _ in range(4)] +\
+              [np.array([  0.,  1.]) for _ in range(6)] +\
+              [np.array([ -1.,  0.]) for _ in range(8)] +\
+              [np.array([  0., -1.]) for _ in range(12)] +\
+              [np.array([  1.,  0.]) for _ in range(0)]
 
     time.sleep(3)
     while not done:

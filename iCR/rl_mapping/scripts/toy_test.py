@@ -76,10 +76,11 @@ def test(params_filepath: str, ckpt_name: str=""):
     env.close()
 
 if __name__ == '__main__':
-    exp_name = "fov-obs-small-fov"
-    ckpt_num = 400000
+    exp_name = "diff-obs-med-fov"
+    ckpt_num = 575000
     time.sleep(3)
-    test(f"checkpoints/toy-ppo/{exp_name}/toy_training_params.yaml")
-    # test(f"checkpoints/toy-ppo/{exp_name}/toy_training_params.yaml", f"{exp_name}_{ckpt_num}_steps.zip")
+    # test(f"checkpoints/diff-ppo/{exp_name}/toy_training_params.yaml")
+    # test(f"checkpoints/diff-ppo/{exp_name}/toy_training_params.yaml", f"{exp_name}_{ckpt_num}_steps.zip")
+    test(f"checkpoints/diff-ppo/{exp_name}/toy_training_params.yaml", "best_model.zip")
 
         
