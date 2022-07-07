@@ -3,6 +3,7 @@ from stable_baselines3 import DDPG, PPO
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.noise import NormalActionNoise
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
+from stable_baselines3.common.vec_env import VecCheckNan
 
 import os, sys, shutil
 import yaml
@@ -24,6 +25,8 @@ def train(params_filepath: str):
     env = ToyQuadrotor(params['map_filepath'], params['env_params_filepath'])
     # wrap with vector env
     env = make_vec_env(lambda: env, n_envs=params['num_envs'])
+    # NaN and Inf checker
+    env = VecCheckNan(env, raise_exception=True)
 
     ### create agent model ###
     # policy network

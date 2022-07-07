@@ -19,4 +19,4 @@ use_diff_obs: True # True: differential/continuous obs; False: binary/discrete o
 use_fov_obs: True # True: fov in obs; False: position in obs
 
 # action
-use_discrete_act: True # True: discrete action space; False: continuous action space
+use_discrete_act: False # True: discrete action space; False: continuous action space

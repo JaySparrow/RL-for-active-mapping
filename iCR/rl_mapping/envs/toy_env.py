@@ -156,11 +156,6 @@ class ToyQuadrotor(gym.Env):
             ## reward = (normalized) difference between logdet of info map in consecutive steps
             cur_r = float(np.sum(np.log(self.info_vec[::self.downsample_rate, ::self.downsample_rate])))
             
-            # ### reward 1 ###
-            # max_r = np.log(self.info_max - self.info_min) * h * w
-            # r = (cur_r - self.last_r) / max_r
-
-            ### reward 2 ###
             max_r = np.log(self.info_max) * h * w
             min_r = np.log(self.info_min) * h * w
             assert np.all((self.last_r <= max_r+1e-6) & (self.last_r >= min_r-1e-6)), f"reward {self.last_r} is out of bound [{min_r}, {max_r}]"
@@ -348,10 +343,10 @@ if __name__ == '__main__':
     while not done:
         if env.use_discrete_act:
             action = actions0[env.current_step+1]
-            print("action =", env.ACTIONS[action])
+            print("action =", env.control_scale * env.ACTIONS[action])
         else:
             action = actions1[env.current_step+1]
-            print("action =", action)
+            print("action =", env.control_scale * action)
 
         obs, r, done, info = env.step(action)
         print("pos =", env.get_agent_coord(env.agent_pos))
