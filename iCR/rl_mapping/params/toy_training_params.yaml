@@ -1,5 +1,5 @@
 # experiment
-exp_name: "volumetric-med-fov"
+exp_name: "varying-std-med-fov"
 
 # paths
 env_params_filepath: "../params/toy_env_params.yaml"
@@ -20,7 +20,7 @@ ppo:
   batch_size: 64
   n_epochs: 10
   gae_lambda: 0.95
-  clip_range: 0.1 # tuned
+  clip_range: 0.2
   ent_coef: 0.0
 ddpg:
   buffer_size: 1024
@@ -31,7 +31,7 @@ log_interval: 1 # DDPG: in episode; PPO: in n_steps
 
 # checkpoints
 save_frequency: 25000 # in steps
-checkpoints_folder: "./checkpoints/ppo/"
+checkpoints_folder: "./checkpoints/std/"
 
 # tensorboard
-tensorboard_folder: "./tensorboard/ppo/"
+tensorboard_folder: "./tensorboard/std/"

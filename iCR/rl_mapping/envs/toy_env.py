@@ -45,6 +45,7 @@ class ToyQuadrotor(gym.Env):
 
         ## parameters
         self.__load_params(params_filename)
+        self.delta = 0.5
 
         ## distribution map
         self.__load_distrib_map(map_filename)
@@ -59,7 +60,7 @@ class ToyQuadrotor(gym.Env):
             # layer 1: info map 
             # layer 2: agent's differential fov (1-Phi)
             # max update per step for each cell: 1 / (\sigma^2); min: 0
-            self.info_max = self.distrib_map.data[:, :, 1].max()+self.total_step/self.std**2
+            self.info_max = self.distrib_map.data[:, :, 1].max()+self.total_step/(self.std*(1-self.delta))**2
             self.info_min = self.distrib_map.data[:, :, 1].min()
             # assert self.info_min > 0, f"initial information map has non-positive entry: {self.info_min}!"
             self.observation_space = spaces.Box(low=min(self.info_min, 0.), high=self.info_max, shape=(2, h, w), dtype=np.float32)
@@ -144,7 +145,10 @@ class ToyQuadrotor(gym.Env):
         Phi = self.get_Phi(self.agent_pos) # (h', w')
 
         ## update information
-        self.info_vec[::self.downsample_rate, ::self.downsample_rate] += 1 / (self.std**2) * (1 - Phi)
+        m = self.__grid_env.semantic_map.data # (h, w)
+        m[m == 255] = 0
+        std = self.std * (1 - self.delta * m)
+        self.info_vec[::self.downsample_rate, ::self.downsample_rate] += 1 / (std**2) * (1 - Phi)
         assert np.all((self.info_min <= self.info_vec) & (self.info_vec <= self.info_max)), "information entry out of bound"
 
         ## obtain newly detected cells
