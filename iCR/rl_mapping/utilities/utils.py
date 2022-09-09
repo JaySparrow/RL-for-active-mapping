@@ -274,7 +274,7 @@ def triangle_SDF(q, psi, r):
 
 def circle_SDF(q, r):
     if q.ndim in {1, 2}:
-        SDF, Grad = np.linalg.norm(q, axis=0) ** 2 - r ** 2, 2 * q
+        SDF, Grad = np.linalg.norm(q, axis=0) - r, 2 * q
     else:
         raise NotImplementedError
     return SDF, Grad

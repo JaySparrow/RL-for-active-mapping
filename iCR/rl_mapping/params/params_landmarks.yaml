@@ -1,0 +1,12 @@
+footprint:
+  type: 'tricky_circle'
+  angular_resolution: 3.14159
+  inflation_scale: 1.0
+
+horizon: 15
+num_iter: 1
+kappa: 0.5
+v_0: 1
+alpha:
+  _1: 5
+  _2: 5
