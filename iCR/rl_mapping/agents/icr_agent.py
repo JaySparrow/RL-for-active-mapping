@@ -10,8 +10,7 @@ from rl_mapping.utilities.utils_landmarks import R_matrix, f, grad_exp_u_hat, ex
 from rl_mapping.utilities.fov_utils import Gaussian_CDF, Gaussian_PDF, circle_SDF, triangle_SDF
 
 
-def create_icr_landmarks_agent_from_params(params_filename, sensor_range, angular_range, position_cov, motion_model_cov,
-                                     num_landmarks, tau):
+def create_icr_landmarks_agent_from_params(params_filename, position_cov, num_landmarks, tau):
 
     assert os.path.exists(params_filename)
     with open(os.path.join(params_filename)) as f:
@@ -45,10 +44,7 @@ def create_icr_landmarks_agent_from_params(params_filename, sensor_range, angula
                            horizon=horizon,
                            tau=tau,
                            num_iter=num_iter,
-                           sensor_range=sensor_range,
-                           angular_range=angular_range,
                            position_cov=position_cov,
-                           motion_model_cov=motion_model_cov,
                            num_landmarks=num_landmarks,
                            kappa=kappa,
                            v_0=v_0,
@@ -58,22 +54,17 @@ def create_icr_landmarks_agent_from_params(params_filename, sensor_range, angula
 
 
 class Icr:
-    def __init__(self, footprint, horizon, tau, num_iter,
-                 sensor_range, angular_range, position_cov, motion_model_cov, num_landmarks,
+    def __init__(self, footprint, horizon, tau, num_iter, position_cov, num_landmarks,
                  kappa, v_0, alpha):
         self._footprint = footprint
         self._horizon = horizon
-        self._tau = tau
+        self.tau = tau
         self._num_iter = num_iter
-        self._sensor_range = sensor_range
-        self._half_angular_range = angular_range / 2
         self._inv_position_cov = np.linalg.inv(position_cov)
-        self._motion_model_cov = motion_model_cov
         self._num_landmarks = num_landmarks
         self._kappa = kappa
         self._v_0 = v_0
         self._alpha = alpha
-        self.tau = 1
         self.radius = 2  # same as in the proposed method
 
         self._b = np.concatenate((np.zeros(3), np.tile(np.array([1, 0, 1]), self._num_landmarks)))
@@ -119,7 +110,7 @@ class Icr:
             # Gradient backpropagation
             for k in range(self._horizon - 1, -1, -1):
                 T_k = state_to_T(robot_traj[:, k])
-                grad_exp_0, grad_exp_1, grad_exp_2 = grad_exp_u_hat(u[:, k], self._tau)
+                grad_exp_0, grad_exp_1, grad_exp_2 = grad_exp_u_hat(u[:, k], self.tau)
                 Lambda_s_0, Lambda_s_1, Lambda_s_2 = T_k @ grad_exp_0, T_k @ grad_exp_1, T_k @ grad_exp_2
 
                 dJ_du_0 = 0
@@ -169,7 +160,7 @@ class Icr:
                     dJ_du_1 -= np.trace(sigma @ dM_du_1 @ sigma)
                     dJ_du_2 -= np.trace(sigma @ dM_du_2 @ sigma)
 
-                    exp_u = exp_u_hat(u[:, s - 1], self._tau)
+                    exp_u = exp_u_hat(u[:, s - 1], self.tau)
                     Lambda_s_0, Lambda_s_1, Lambda_s_2 = Lambda_s_0 @ exp_u, Lambda_s_1 @ exp_u, Lambda_s_2 @ exp_u
 
                 u[0, k] -= self._alpha[0] * dJ_du_0
@@ -181,7 +172,7 @@ class Icr:
         sigma_list = [sigma_landmarks.copy()]
         inv_sigma = np.linalg.inv(sigma_list[-1])
         for k in range(self._horizon):
-            robot_traj[:, k + 1] = f(robot_traj[:, k], u[:, k], np.zeros(3), self._tau)
+            robot_traj[:, k + 1] = f(robot_traj[:, k], u[:, k], np.zeros(3), self.tau)
             inv_sigma += self._compute_M(robot_traj[:, k + 1], landmarks)
             sigma_list.append(np.linalg.inv(inv_sigma))
 

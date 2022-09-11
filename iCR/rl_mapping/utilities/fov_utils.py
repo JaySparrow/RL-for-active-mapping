@@ -70,5 +70,12 @@ def Gaussian_PDF(x, kap):
     return Phi_der
 
 def circle_SDF(q, r):
-    SDF, Grad = np.linalg.norm(q) - r, 2 * q
+    SDF, Grad = np.linalg.norm(q, axis=1) - r, 2 * q
     return SDF, Grad
+
+# import numpy as np
+# def main():
+#     print(triangle_SDF(np.array([[2,3], [3,5], [2, 8]]), .5, 0.5))
+#
+# if __name__ == '__main__':
+#     main()

@@ -4,9 +4,9 @@ footprint:
   inflation_scale: 1.0
 
 horizon: 15
-num_iter: 1
+num_iter: 100
 kappa: 0.5
-v_0: 1
+v_0: 3
 alpha:
-  _1: 5
-  _2: 5
+  _1: .005
+  _2: .005

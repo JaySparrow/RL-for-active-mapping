@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.special import erf
 
 def state_to_T(state):
     return np.array([[np.cos(state[2]), -np.sin(state[2]), state[0]], [np.sin(state[2]), np.cos(state[2]), state[1]],
@@ -110,5 +110,25 @@ def exp_hat(u, dt):
 def unicycle_dyn(state,u,dt):
     T = state_to_T(state)
     T_next = SE2_motion(T,u,dt)
-    state_next = T_to_state(T_next) + np.random.normal(0, .2, [3,])
+    state_next = T_to_state(T_next)
+                 # + np.random.normal(0, .2, [3,])
     return state_next
+
+def diff_FoV_land(x,y,n_y,r,kap,std):
+    V_jj_inv = np.zeros((2 * n_y, 2 * n_y))
+    for j in range(n_y):
+        q = x[:2] - y[j * 2: j * 2 + 2].T
+        SDF, Grad = circle_SDF(q,r)
+        Phi, Phi_der =  Gaussian_CDF(SDF, kap)
+        V_jj_inv[2 * j, 2 * j] = 1 / (std ** 2) * (1 - Phi)
+        V_jj_inv[2 * j + 1, 2 * j+1] = 1 / (std ** 2) * (1 - Phi)
+    return V_jj_inv
+
+def circle_SDF(q, r):
+    SDF, Grad = np.linalg.norm(q) - r, 2 * q
+    return SDF, Grad
+
+def Gaussian_CDF(x, kap):
+    Psi = (1 + erf(x / (np.sqrt(2) * kap) - 2)) / 2
+    Psi_der = 1 / (np.sqrt(2 * np.pi) * kap) * np.exp(- (x / (np.sqrt(2) * kap) - 2) ** 2)
+    return Psi, Psi_der
