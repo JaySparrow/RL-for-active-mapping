@@ -24,7 +24,7 @@ np.random.seed(100)
 class SimpleQuadrotor(gym.Env):
     metadata = {'render.modes': ['human', 'terminal']}
 
-    def __init__(self, num_landmarks, horizon, landmarks, test=False):
+    def __init__(self, num_landmarks, horizon, for_comparison=False, test=False):
         super(SimpleQuadrotor, self).__init__()
 
         # variables
@@ -45,38 +45,9 @@ class SimpleQuadrotor(gym.Env):
                                             dtype=np.float32)  # (x, y, \theta, info_mat_0, info_mat_1, info_mat_2, info_mat_3): {-inf, inf}^7
 
         # landmark and info_mat init
-        if self.test == False:
-            self.landmarks = landmarks
-        else:
-            if num_landmarks == 5:
-                self.landmarks = np.array(
-                    [[0.43404942], [-2.21630615], [-0.75482409], [3.44776132], [-4.95281144], [-3.78430879],
-                     [1.70749085], [3.25852755], [-3.6329341], [0.75093329]])
-            elif num_landmarks == 15:
-                self.landmarks = np.array(
-                    [[0.86809884], [-4.4326123], [-1.50964819], [6.89552265], [-9.90562288], [-7.56861758],
-                     [3.41498169], [6.5170551], [-7.26586821], [1.50186659], [7.82643909], [-5.81595756], [-6.29343561],
-                     [-7.83246219],
-                     [-5.60605015], [9.57247569], [6.23366298], [-6.56117975], [6.32449497], [-4.51852506],
-                     [-1.36591633], [8.80059639],
-                     [6.35298758], [-3.277761], [-6.49179093], [-2.54335907], [-9.88622985], [-4.95147293],
-                     [5.91325017], [-9.69490058]])
-            elif num_landmarks == 25:
-                self.landmarks = np.array(
-                    [[-9.82638023], [-0.88652246], [-10.30192964], [1.37910453], [-11.98112458], [-1.51372352],
-                     [-9.31700366], [1.30341102], [-11.45317364], [0.30037332], [1.56528782], [8.83680849],
-                     [-1.25868712], [8.43350756],
-                     [-1.12121003], [11.91449514], [1.2467326], [8.68776405], [1.26489899], [9.09629499], [9.72681673],
-                     [1.76011928],
-                     [11.27059752], [-0.6555522], [8.70164181], [-0.50867181], [8.02275403], [-0.99029459],
-                     [11.18265003], [-1.93898012],
-                     [0.39537351], [-9.58478184], [-1.57940926], [-10.47222622], [-1.85409577], [-8.43835375],
-                     [1.92368343], [-11.76023204],
-                     [1.56218378], [-9.692394], [0.96991876], [0.52073575], [0.32736877], [-1.91824347], [-1.15989369],
-                     [0.17873951],
-                     [1.07646068], [-0.99721908], [-0.85641724], [1.40958035]])
         self.info_mat_init = np.diag([.5] * self.num_landmarks * 2).astype(np.float32)
         self.info_mat = self.info_mat_init.copy()
+        self.for_comparison = for_comparison
 
     def step(self, action):
         self.current_step += 1
@@ -163,22 +134,20 @@ class SimpleQuadrotor(gym.Env):
 
         return self.state, reward, done, info
 
-    def reset(self):
+    def reset(self, init_agent_landmarks=None):
         # landmark and info_mat init
         self.info_mat = self.info_mat_init.copy()
         # an extremely large value which guarantee this landmark's position has much lower uncertainty
-        # self.random_serial = np.random.randint(0, self.num_landmarks)
-        # self.info_mat[self.random_serial * 2, self.random_serial * 2], \
-        # self.info_mat[self.random_serial * 2 + 1, self.random_serial * 2 + 1] = 100, 100
-        lx = np.random.uniform(low=-10, high=10, size=(self.num_landmarks, 1))
-        ly = np.random.uniform(low=-10, high=10, size=(self.num_landmarks, 1))
-        self.landmarks = np.concatenate((lx, ly), 1).reshape(self.num_landmarks * 2, 1)
-        self.landmarks_estimate = self.landmarks + np.random.normal(0, STD, np.shape(self.landmarks))
 
-        # agent pose init
-        # self.agent_pos = np.zeros(STATE_DIM, dtype=np.float32)
-        self.agent_pos = np.array([random.uniform(-2, 2), random.uniform(-2, 2), 0])
-        # self.agent_pos = np.array([0, 0, 0])
+        if self.for_comparison == False:
+            lx = np.random.uniform(low=-self.bound, high=self.bound, size=(self.num_landmarks, 1))
+            ly = np.random.uniform(low=-self.bound, high=self.bound, size=(self.num_landmarks, 1))
+            self.landmarks = np.concatenate((lx, ly), 1).reshape(self.num_landmarks * 2, 1)
+            self.agent_pos = np.array([random.uniform(-2, 2), random.uniform(-2, 2), 0])
+        else:
+            self.landmarks = np.array(init_agent_landmarks[0])
+            self.agent_pos = np.array(init_agent_landmarks[1])
+        self.landmarks_estimate = self.landmarks + np.random.normal(0, STD, np.shape(self.landmarks))
 
         # state init
         self.state = np.hstack([

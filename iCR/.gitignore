@@ -6,3 +6,4 @@ rl_mapping/envs/__pycache__
 rl_mapping/networks/__pycache__
 rl_mapping/scripts/checkpoints
 rl_mapping/scripts/tensorboard
+rl_mapping/scripts/plots
