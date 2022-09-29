@@ -10,7 +10,7 @@ from rl_mapping.utilities.utils_landmarks import R_matrix, f, grad_exp_u_hat, ex
 from rl_mapping.utilities.fov_utils import Gaussian_CDF, Gaussian_PDF, circle_SDF, triangle_SDF
 
 
-def create_icr_landmarks_agent_from_params(params_filename, position_cov, num_landmarks, tau):
+def create_icr_landmarks_agent_from_params(params_filename, position_cov, num_landmarks, horizon, tau):
 
     assert os.path.exists(params_filename)
     with open(os.path.join(params_filename)) as f:
@@ -34,7 +34,6 @@ def create_icr_landmarks_agent_from_params(params_filename, position_cov, num_la
                                 angular_resolution=params['footprint']['angular_resolution'],
                                 inflation_scale=params['footprint']['inflation_scale'])
 
-    horizon = params['horizon']
     num_iter = params['num_iter']
     kappa = params['kappa']
     v_0 = params['v_0']

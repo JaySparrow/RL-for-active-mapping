@@ -22,8 +22,8 @@ parser.add_argument('--for-comparison', type=int, default=0, help="0 means this 
 args = parser.parse_args()
 NUM_TEST = 10
 icr_landmarks_agent = create_icr_landmarks_agent_from_params(
-    params_filename=os.path.join(os.path.abspath(os.path.join("", os.pardir)), "params/params_landmarks.yaml"), tau=1,
-                                                      num_landmarks=args.num_landmarks, position_cov=0.5 * np.diag(np.array([1, 1])))
+    params_filename=os.path.join(os.path.abspath(os.path.join("", os.pardir)), "params/params_landmarks.yaml"),
+    position_cov=0.5 * np.diag(np.array([1, 1])), num_landmarks=args.num_landmarks, horizon=args.horizon, tau=1)
 element_store = [[[[0.781016062837196], [0.7181309279503498], [3.4430298619587116], [-1.2215232105775247],
                    [1.644214017146302], [2.334305809066498]], [-0.24965115494922996, 1.567092003128319, 0.0]], [
                      [[7.4186041680164685], [0.4623187160464717], [-1.8649356987875567], [1.088712977502917],
@@ -339,6 +339,10 @@ def test_agent():
             else:
                 obs = env.reset()
                 env.render(mode='human')
+                env.save_plot(name=os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                                "plots/test_landmarknum{}_step{}.png".format(
+                                                    args.num_landmarks, 0)),
+                              title=f'return = {0}')
             total_reward = 0
 
             u = icr_landmarks_agent.plan(np.append(obs[:2], 0), mu_landmarks=obs[2 + args.num_landmarks * 2:],
@@ -350,8 +354,12 @@ def test_agent():
             for k in range(args.horizon):
                 obs, r, done, info = env.step(u[:, k])
                 total_reward += r
-                # env.render(mode='human')
+                env.render(mode='human')
                 # print("action:", u[:, k])
+                env.save_plot(name=os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                                "plots/test_landmarknum{}_step{}.png".format(
+                                                    args.num_landmarks, k+1)),
+                              title=f'return = {0}')
 
             print(total_reward)
             if total_reward > best_reward:
@@ -359,12 +367,17 @@ def test_agent():
 
         if args.for_comparison == True:
             if j == 0:
-                data = ["iCR" + "_num_landmarks_" + str(args.num_landmarks) + "\n" + str(best_reward) + "\n"]
+                data = ["iCR" + "_num_landmarks_" + str(args.num_landmarks) + "\n" + str(np.round(best_reward, 3)) + " " + str(np.round(info, 3)) + "\n"]
             else:
-                data = [str(best_reward) + "\n"]
+                data = [str(np.round(best_reward, 3)) + " " + str(np.round(info, 3)) + "\n"]
             for element in data:
                 my_open_results.write(element)
             print("best_reward for this map:", best_reward)
+
+        env.save_plot(name=os.path.join(os.path.abspath(os.path.dirname(__file__)),
+                                        "plots/test_landmarknum{}_eps{}.png".format(
+                                            args.num_landmarks, str(args.count * 30 + j))),
+                      title=f'return = {best_reward}')
 
     my_open_results.close()
 
