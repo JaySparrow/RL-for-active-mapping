@@ -17,7 +17,7 @@ This paper proposes a method for learning continuous control policies for active
 exploration using an information-theoretic cost. We consider a mobile robot detecting landmarks within a limited sensing
 range, and tackle the problem of learning a control policy that maximizes the mutual information between the landmark
 states and the sensor observations. Here is a pipeline for our work:
-![avatar](data:./teaser.png)
+![avatar](https://github.com/JaySparrow/RL-for-active-mapping/blob/master/teaser.png)
 
 ## Instruction
 1. First clone this repo and install the dependencies running the following commands in the terminal:
