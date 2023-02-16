@@ -18,9 +18,7 @@ exploration using an information-theoretic cost. We consider a mobile robot dete
 range, and tackle the problem of learning a control policy that maximizes the mutual information between the landmark
 states and the sensor observations. Here is a pipeline for our work:
 
-[//]: # (![avatar]&#40;https://github.com/JaySparrow/RL-for-active-mapping/blob/master/teaser.png&#41;)
- <img src="./teaser.png" width = "600" height = "350" alt="图片名称" align=center />
-
+<div style="text-align:center"><img src="https://github.com/JaySparrow/RL-for-active-mapping/blob/master/teaser.png" width = "600" height = "350"/></div>
 
 ## Instruction
 1. First clone this repo and install the dependencies running the following commands in the terminal:
@@ -46,9 +44,9 @@ There are multiple arguments for you to tune with for different scenarios. You c
 ```
 python ./agent_unity_test.py 
 ```
-3. To play with Unity env, build it with the repo you have cloned:
-1) Create a directory `./toy_active_mappking_ppo/Unity_envs` in your ```RL-for-active-mapping``` repo.
-2) Build the environment with the cloned ```Landmark-based-mapping-Unity``` repo to ```Unity_envs``` just created.
+3. To play with Unity env, build it with the repo you have cloned:  
+(1) Create a directory `./toy_active_mappking_ppo/Unity_envs` in your ```RL-for-active-mapping``` repo.  
+(2) Build the environment with the cloned ```Landmark-based-mapping-Unity``` repo to ```Unity_envs``` just created.
 
 
 
