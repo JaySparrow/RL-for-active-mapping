@@ -1,8 +1,7 @@
 # Landmark-based mapping
 Thank you for being interested in our work! This repository is a PyTorch implementation for paper ***[Learning Continuous Control Policies for Information-Theoretic Active Perception](https://arxiv.org/pdf/2209.12427.pdf)***
 in ICRA 2023. Authors: [Pengzhi Yang](https://pengzhi1998.github.io/), 
-[Yuhan Liu](https://jaysparrow.github.io/), [Shumon Koga](https://shumon0423.github.io/), Arash Asgharivaskasi, 
-[Nikolay Atanasov](https://natanaso.github.io/).
+[Yuhan Liu](https://jaysparrow.github.io/), [Shumon Koga](https://shumon0423.github.io/), [Arash Asgharivaskasi](https://arashasgharivaskasi-bc.github.io/), [Nikolay Atanasov](https://natanaso.github.io/).
 If you are using the code for research work, please cite:
 ```
 @inproceedings{yang2023icra,
